@@ -24,6 +24,7 @@ allowed-tools: Read, Write, Edit, Bash, Web
 | `@brain` | 通用启动：处理一段知识输入 |
 | `帮我整理\|帮我记录\|记下来\|保存这个` | 用户有内容需要存入知识库 |
 | 用户发送**文件路径**（.docx/.pdf/.txt/.md） | 自动检测扩展名，读取并处理 |
+| 用户发送**网页链接/视频链接**（http:// 或 https://） | 自动抓取网页内容，提炼核心信息 |
 | 用户粘贴/输入一段**非结构化文本**（会议记录、笔记、灵感、文章片段） | 自动识别并处理 |
 | `查一下\|搜索\|我记得\|关于 [[某概念]]` | 查询知识库模式 |
 
@@ -68,6 +69,43 @@ allowed-tools: Read, Write, Edit, Bash, Web
 | `.docx` | `python3 -c "import zipfile, xml.etree.ElementTree as ET; ..."`（内置库，不需额外依赖） |
 | `.txt`, `.md` | 直接 `read_file` 工具 |
 | `.pdf` | `python3 -c "import PyPDF2; ..."` 或 ocr 工具 |
+
+#### 从网页链接读取（如果用户发送了 http:// 或 https://）
+
+用浏览器工具或 curl 抓取页面内容：
+
+1. **判断链接类型**：
+   - 文章/文档页 → 提取正文内容
+   - 视频页（YouTube/B站等）→ 提取标题、描述、字幕（如有）
+   - 社交媒体帖 → 提取帖文内容
+
+2. **提取核心内容**：
+   ```bash
+   # 通用网页抓取
+   curl -sL "{{URL}}" | python3 -c "
+   import sys, re
+   html = sys.stdin.read()
+   # 提取 <title>
+   title = re.search(r'<title>(.*?)</title>', html, re.DOTALL)
+   # 提取 <meta description>
+   desc = re.search(r'<meta name=\"description\" content=\"(.*?)\"', html)
+   # 提取正文段落（简化：取 <p> 标签内容）
+   paras = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
+   clean = [re.sub(r'<[^>]+>', '', p).strip() for p in paras if len(p) > 50]
+   print(title.group(1) if title else 'No title')
+   print('---')
+   print(desc.group(1) if desc else '')
+   print('---')
+   for p in clean[:20]:
+       print(p)
+       print()
+   "
+   ```
+
+3. **用 browser 工具（如果 curl 抓取不够）**：
+   - 用 `browser_navigate` 打开页面
+   - 用 `browser_snapshot` 获取页面内容
+   - 用 `browser_console` 执行 JS 提取正文
 ### 模式一：知识录入（默认模式）
 
 当用户提供非结构化输入时，按以上 Step 0 → Step 1 → Step 2 顺序执行，然后继续：
