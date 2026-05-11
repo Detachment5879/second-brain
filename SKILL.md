@@ -23,6 +23,7 @@ allowed-tools: Read, Write, Edit, Bash, Web
 |--------|------|
 | `@brain` | 通用启动：处理一段知识输入 |
 | `帮我整理\|帮我记录\|记下来\|保存这个` | 用户有内容需要存入知识库 |
+| 用户发送**文件路径**（.docx/.pdf/.txt/.md） | 自动检测扩展名，读取并处理 |
 | 用户粘贴/输入一段**非结构化文本**（会议记录、笔记、灵感、文章片段） | 自动识别并处理 |
 | `查一下\|搜索\|我记得\|关于 [[某概念]]` | 查询知识库模式 |
 
@@ -30,13 +31,48 @@ allowed-tools: Read, Write, Edit, Bash, Web
 
 ## 核心工作流
 
+### Step 0：环境初始化
+每次启动时，先执行以下检查：
+
+1. **检查知识库路径**：
+   ```bash
+   # 如果 OBSIDIAN_VAULT_PATH 未设置，尝试探测 Windows 知识库
+   if [ -z "$OBSIDIAN_VAULT_PATH" ]; then
+     if [ -d "/mnt/d/知识库" ]; then
+       export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
+     elif [ -d "/mnt/c/Users/$USER/Desktop/知识库" ]; then
+       export OBSIDIAN_VAULT_PATH="/mnt/c/Users/$USER/Desktop/知识库"
+     fi
+   fi
+   echo "知识库路径: ${OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}"
+   ```
+
+2. **检查依赖工具**：
+   ```bash
+   # 检查 python-docx（用于读取 .docx 文件）
+   python3 -c "import docx" 2>/dev/null || pip install python-docx 2>/dev/null || true
+   ```
+
+3. **确保知识库目录存在**：
+   ```bash
+   mkdir -p "${OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}"/{meetings,readings,ideas,insights,technical,people,concepts,retrospectives,inbox,logs}
+   ```
+
+### Step 1：读取与解析输入
+
+#### 从文件读取（如果用户提供了文件路径）
+检测文件扩展名，用对应方式读取：
+
+| 文件类型 | 读取方式 |
+|----------|----------|
+| `.docx` | `python3 -c "import zipfile, xml.etree.ElementTree as ET; ..."`（内置库，不需额外依赖） |
+| `.txt`, `.md` | 直接 `read_file` 工具 |
+| `.pdf` | `python3 -c "import PyPDF2; ..."` 或 ocr 工具 |
 ### 模式一：知识录入（默认模式）
 
-当用户提供非结构化输入时，按以下步骤处理：
+当用户提供非结构化输入时，按以上 Step 0 → Step 1 → Step 2 顺序执行，然后继续：
 
-#### Step 1：判断内容类型
-
-分析用户输入，判断属于以下哪种类型：
+#### Step 3：知识建模
 
 | 类型 | 特征 | 输出笔记type |
 |------|------|-------------|
@@ -68,7 +104,7 @@ allowed-tools: Read, Write, Edit, Bash, Web
    - 检查是否有相同标签
    - 记录关联关系用于后续检索
 
-#### Step 3：生成 Obsidian Markdown
+#### Step 4：生成 Obsidian Markdown
 
 执行写入工具生成标准化的笔记文件：
 
@@ -82,7 +118,16 @@ python3 ${HERMES_SKILL_DIR}/scripts/second-brain-writer.py \
   --thinking "{{AI的推理笔记}}"
 ```
 
-#### Step 4：存入知识库
+如果需要输出到非默认目录（如 Windows D 盘），加上 `--dir` 参数：
+
+```bash
+python3 ${HERMES_SKILL_DIR}/scripts/second-brain-writer.py \
+  --title "..." --type "..." --tags "..." \
+  --content "..." --entities "..." \
+  --dir "/mnt/d/知识库"
+```
+
+#### Step 5：存入知识库
 
 知识库目录结构：
 

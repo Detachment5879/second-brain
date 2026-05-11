@@ -14,6 +14,9 @@ Second Brain — Obsidian知识库写入工具
   
   # 统计知识库
   python3 second-brain-writer.py --stats
+
+  # 输出到指定目录
+  python3 second-brain-writer.py --title "笔记" --type idea --content "内容" --dir "/mnt/d/知识库"
 """
 
 import argparse
@@ -24,6 +27,12 @@ from datetime import datetime
 from pathlib import Path
 
 VAULT_PATH = os.environ.get("OBSIDIAN_VAULT_PATH", str(Path.home() / "Documents" / "second-brain"))
+
+def resolve_vault_path(custom_dir=None):
+    """Return the effective vault path. Prefer custom_dir if provided."""
+    if custom_dir:
+        return custom_dir
+    return VAULT_PATH
 
 TYPE_DIR_MAP = {
     "meeting-note": "meetings",
@@ -37,13 +46,14 @@ TYPE_DIR_MAP = {
     "default": "inbox",
 }
 
-def ensure_vault_structure():
+def ensure_vault_structure(vault_path=None):
     """Ensure the vault directory structure exists."""
+    vp = Path(resolve_vault_path(vault_path))
     dirs = set(TYPE_DIR_MAP.values()) | {"logs", "inbox"}
     for d in dirs:
-        (Path(VAULT_PATH) / d).mkdir(parents=True, exist_ok=True)
+        (vp / d).mkdir(parents=True, exist_ok=True)
     # Create .index.md if not exists
-    index_path = Path(VAULT_PATH) / ".index.md"
+    index_path = vp / ".index.md"
     if not index_path.exists():
         index_path.write_text(
             f"# Second Brain Index\n\n*Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}*\n\n"
@@ -64,9 +74,10 @@ def get_target_dir(content_type: str) -> str:
     """Get the target subdirectory for a content type."""
     return TYPE_DIR_MAP.get(content_type, TYPE_DIR_MAP["default"])
 
-def update_index(title: str, filepath: Path, tags: list, content_type: str):
+def update_index(title: str, filepath: Path, tags: list, content_type: str, vault_path=None):
     """Update .index.md with new entry."""
-    index_path = Path(VAULT_PATH) / ".index.md"
+    vp = Path(resolve_vault_path(vault_path))
+    index_path = vp / ".index.md"
     relative_path = filepath.relative_to(VAULT_PATH)
     date = datetime.now().strftime("%Y-%m-%d")
     
@@ -75,9 +86,10 @@ def update_index(title: str, filepath: Path, tags: list, content_type: str):
     with open(index_path, "a", encoding="utf-8") as f:
         f.write(entry)
 
-def update_changelog(title: str, action: str = "created"):
+def update_changelog(title: str, action: str = "created", vault_path=None):
     """Update changelog."""
-    log_path = Path(VAULT_PATH) / "logs" / "changelog.md"
+    vp = Path(resolve_vault_path(vault_path))
+    log_path = vp / "logs" / "changelog.md"
     if not log_path.exists():
         log_path.write_text("# Changelog\n\n")
     
@@ -86,12 +98,13 @@ def update_changelog(title: str, action: str = "created"):
         f.write(f"- {date} | {action}: [[{title}]]\n")
 
 def write_note(title: str, content_type: str, tags: list, 
-               content: str, entities: list, thinking: str = ""):
+               content: str, entities: list, thinking: str = "", vault_path=None):
     """Create a formatted Obsidian note."""
-    ensure_vault_structure()
+    vp = resolve_vault_path(vault_path)
+    ensure_vault_structure(vault_path)
     
     date = datetime.now().strftime("%Y-%m-%d")
-    target_dir = Path(VAULT_PATH) / get_target_dir(content_type)
+    target_dir = Path(vp) / get_target_dir(content_type)
     filename = generate_filename(title)
     filepath = target_dir / filename
     
@@ -141,15 +154,16 @@ sources: []
 """
     
     filepath.write_text(frontmatter + body, encoding="utf-8")
-    update_index(title, filepath, tags, content_type)
-    update_changelog(title, "created")
+    update_index(title, filepath, tags, content_type, vault_path)
+    update_changelog(title, "created", vault_path)
     
     return filepath
 
-def get_stats():
+def get_stats(vault_path=None):
     """Show knowledge base statistics."""
-    ensure_vault_structure()
-    vault = Path(VAULT_PATH)
+    vp = Path(resolve_vault_path(vault_path))
+    ensure_vault_structure(vault_path)
+    vault = vp
     
     total = 0
     type_counts = {}
@@ -213,11 +227,14 @@ def main():
     parser.add_argument("--entities", default="", help="实体列表(逗号分隔)")
     parser.add_argument("--thinking", default="", help="AI推理过程")
     parser.add_argument("--stats", action="store_true", help="显示知识库统计")
+    parser.add_argument("--dir", default=None, help="输出目录（覆盖 OBSIDIAN_VAULT_PATH）")
     
     args = parser.parse_args()
     
+    vault_path = args.dir
+    
     if args.stats:
-        get_stats()
+        get_stats(vault_path)
         return
     
     if not args.title or not args.content:
@@ -227,7 +244,7 @@ def main():
     tags = [t.strip() for t in args.tags.split(",") if t.strip()]
     entities = [e.strip() for e in args.entities.split(",") if e.strip()]
     
-    filepath = write_note(args.title, args.type, tags, args.content, entities, args.thinking)
+    filepath = write_note(args.title, args.type, tags, args.content, entities, args.thinking, vault_path)
     
     result = {
         "status": "ok",
