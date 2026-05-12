@@ -78,7 +78,6 @@ def update_index(title: str, filepath: Path, tags: list, content_type: str, vaul
     """Update .index.md with new entry."""
     vp = Path(resolve_vault_path(vault_path))
     index_path = vp / ".index.md"
-    relative_path = filepath.relative_to(VAULT_PATH)
     date = datetime.now().strftime("%Y-%m-%d")
     
     entry = f"- {date} | [[{title}]] | `{content_type}` | Tags: {' '.join(tags)}\n"
