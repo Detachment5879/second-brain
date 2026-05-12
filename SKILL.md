@@ -1,7 +1,7 @@
 ---
 name: second-brain
 description: Transform any unstructured input (meeting notes, articles, chat logs, ideas) into structured Obsidian knowledge nodes. Builds and maintains your personal knowledge base with bidirectional links, tags, and knowledge graphs.
-version: 1.0.0
+version: 1.1.0
 allowed-tools: Read, Write, Edit, Bash, Web
 ---
 
@@ -291,10 +291,36 @@ sources:
 
 ---
 
+## 已知问题与规避（实战总结）
+
+### 1. 旧版 .ppt 文件读取
+- `.ppt`（旧版 OLE 格式）无法用 python-pptx 读取
+- **规避**：用 `strings file.ppt | grep -E '.{15,}'` 提取纯文本
+- 或先用 LibreOffice 转为 .pptx
+
+### 2. --content 参数换行符转义
+- 通过 shell 传 `--content` 时 `\n` 会被转义为字面量而非换行
+- **规避**：写入笔记文件后执行 `content.replace('\\n', '\n')` 修复
+
+### 3. --dir 模式下 index 写入崩溃
+- `update_index()` 中的 `filepath.relative_to(VAULT_PATH)` 在用 `--dir` 时崩溃
+- **已修复**：移除 `relative_to` 调用，全链传递 `vault_path`
+
+### 4. 图片/语音限制
+- ❌ 不能处理纯音频文件
+- ✅ 能用 vision_analyze 读取图片文字（适合PPT截图、手写笔记、聊天记录截图）
+
+### 5. 知识库路径探测优先级
+1. `$OBSIDIAN_VAULT_PATH` 环境变量
+2. `/mnt/d/知识库`（Windows D盘）
+3. `$HOME/Documents/second-brain`（默认）
+
+---
+
 ## 安全边界
 
-1. **仅处理用户主动提供的信息**，不主动搜索用户隐私数据
-2. **本地优先**：所有知识库文件存储在本地，不自动上传
+1. **仅处理用户主动提供的信息**
+2. **本地优先**：所有文件存储本地，不自动上传
 3. **透明更新**：修改已有笔记前向用户确认
 
 ---
