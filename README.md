@@ -107,7 +107,7 @@ second-brain-writer.py → Obsidian Vault (.md 文件)
 ```bash
 # 1. 拿到脚本
 git clone https://github.com/Detachment5879/second-brain.git
-cd second-brain/brain-enhance/scripts
+cd second-brain/scripts
 
 # 2. 设知识库路径
 export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
@@ -121,7 +121,7 @@ python3 brain-scheduler.py connect   # 合成建议
 **配定时任务（Linux/macOS）：**
 ```bash
 crontab -e
-0 20 * * * cd ~/second-brain/brain-enhance/scripts && python3 brain-scheduler.py review
+0 20 * * * cd ~/second-brain/scripts && python3 brain-scheduler.py review
 ```
 
 **配定时任务（Windows）：**
