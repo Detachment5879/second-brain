@@ -65,20 +65,30 @@ D:\知识库\
 
 ## 快速开始
 
+**一行命令安装：**
+
 ```bash
-# 1. 安装 Skills（放入 Hermes Agent 的 skills 目录）
+curl -fsSL https://raw.githubusercontent.com/Detachment5879/second-brain/main/install.sh | bash
+```
 
-# 2. 设置知识库路径（可选，自动探测 D:\知识库）
+**然后设置知识库路径（可选，自动探测 `D:\知识库`）：**
+
+```bash
 export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
+```
 
-# 3. 日常使用
-@brain 今天和张三讨论了微服务架构，决定后端用Go...
+**开始使用：**
+
+```bash
+@brain KSTAR熔断机制的核心是预测试≥80%跳过...
 @brain save                    # 存档当前对话
 @brain review                  # 今日复习
 @brain connect agent记忆       # 合成相关笔记
 @brain stats                   # 知识仪表盘
 @brain feishu on               # 开启飞书推送
 ```
+
+> 非 Hermes 用户看下方「非 Hermes 用户使用指南」
 
 ## 扩展模块
 
