@@ -11,22 +11,33 @@
 
 ## 是什么
 
-Second Brain 是 Hermes Agent 的知识管理中枢。你和 AI 聊完天、读完文章、开完会——它自动把有价值的内容提炼成永久笔记，存入你的 Obsidian 知识库。**理论/案例二分，双向链接，随时检索。**
+Second Brain 是 Hermes Agent 的知识管理中枢。你和 AI 聊完天、读完文章、开完会——它自动把有价值的内容提炼成永久笔记，存入你的 Obsidian 知识库。**理论/案例二分，双向链接，智能评分，定时复习推送。**
+
+## 模块体系
+
+```
+second-brain/          ← 主脑：知识录入 + 查询 + 维护
+brain-auto-save/       ← 副脑：对话自动存档 + 价值审查
+brain-enhance/         ← 增强：间隔复习 + 知识合成 + 评分 + 飞书推送
+```
 
 ## 能力矩阵
 
-| 模式 | 触发 | 做什么 |
+| 命令 | 模块 | 做什么 |
 |------|------|--------|
-| 📥 **知识录入** | `@brain` + 内容/文件/链接 | 碎片信息 → 去噪 → 建模 → Obsidian 笔记 |
-| 💬 **对话存档** | `@brain save` | 分析整段对话 → 价值审查 → 理论/案例分类存入 |
-| 🔍 **智能检索** | 提问时自动 | 搜索知识库 → 关联展开 → 综合回答 |
-| 🛠 **知识维护** | `@brain maintain` | 坏链检查、索引重建、孤立笔记清理 |
+| `@brain` + 内容/文件/链接 | 主脑 | 碎片信息 → 去噪 → 建模 → Obsidian 笔记 |
+| `@brain save` | 副脑 | 分析对话 → 价值审查 → 理论/案例分类存入 |
+| `@brain review` | 增强 | 抽高优先级旧笔记推送复习 |
+| `@brain connect` | 增强 | 扫描关联笔记簇 → AI 合成综合笔记 |
+| `@brain score [笔记] [1-5]` | 增强 | 修改笔记优先级评分 |
+| `@brain stats` | 增强 | 知识增长仪表盘 |
+| `@brain feishu on\|off` | 增强 | 飞书每晚 8 点自动推送复习卡片 |
+| `@brain maintain` | 主脑 | 坏链检查、索引重建、孤立笔记清理 |
+| 自然提问 | 主脑 | 搜索知识库 → 关联展开 → 综合回答 |
 
 ## 核心设计
 
 ### 价值审查（不什么都存）
-
-存入前三条标准过滤：
 
 | 标准 | 通过 | 不通过 |
 |------|------|--------|
@@ -34,7 +45,14 @@ Second Brain 是 Hermes Agent 的知识管理中枢。你和 AI 聊完天、读�
 | 可复用性 | 以后还会用到 | 一次性操作指令 |
 | 结构化潜力 | 能提炼成要点/原则 | 纯闲聊、情绪表达 |
 
-查重 + 脱敏 + 去噪，展示清单，**用户确认后才写入**。
+查重 + 脱敏 + 去噪 → 展示清单 → **用户确认后才写入**。
+
+### 间隔复习 · 飞书推送
+
+笔记自动评分（1-5），高分笔记按间隔推送复习：
+- ⭐5：每 3 天 | ⭐4：每 7 天 | ⭐3：每 14 天 | 低分：不推
+
+开启飞书推送后，每晚 8 点自动发送 3 条复习卡片。未配置飞书则在对话内展示。
 
 ### 知识库结构
 
@@ -48,44 +66,45 @@ D:\知识库\
 ## 快速开始
 
 ```bash
-# 1. 安装 Skill
-# 将 SKILL.md 放入 Hermes Agent 的 skills 目录
+# 1. 安装 Skills（放入 Hermes Agent 的 skills 目录）
 
-# 2. 设置知识库路径（可选，自动探测）
+# 2. 设置知识库路径（可选，自动探测 D:\知识库）
 export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
 
-# 3. 开始使用
+# 3. 日常使用
 @brain 今天和张三讨论了微服务架构，决定后端用Go...
-@brain save              # 存档当前对话
-@brain 查一下微服务      # 搜索知识库
-@brain maintain           # 维护知识库
+@brain save                    # 存档当前对话
+@brain review                  # 今日复习
+@brain connect agent记忆       # 合成相关笔记
+@brain stats                   # 知识仪表盘
+@brain feishu on               # 开启飞书推送
 ```
 
 ## 扩展模块
 
 | 模块 | 说明 |
 |------|------|
-| [brain-auto-save](https://github.com/Detachment5879/hermes-agent/tree/main/skills/note-taking/brain-auto-save) | 对话自动存档扩展，对话结束时的价值审查与归档 |
-| `second-brain-writer.py` | Obsidian 写入工具（已内置） |
+| brain-auto-save | 对话自动存档 + 价值审查 |
+| brain-enhance | 间隔复习 + 知识合成 + 智能评分 + 飞书推送 |
 
-> Second Brain 负责「你主动给我的」，brain-auto-save 负责「聊完天后自动提取的」。两者共用同一知识库。
+> 三个模块共用同一知识库，标签和链接体系互通。
 
 ## 原理
 
 ```
-用户输入 → AI Agent + Second Brain 提示词
-    ↓ 判断类型 → 提取实体 → 建模标签 → 价值审查
+用户输入 → AI Agent + Second Brain 体系
+    ↓ 判断类型 → 提取实体 → 建模标签 → 价值审查 + 评分
     ↓ 用户确认
 second-brain-writer.py → Obsidian Vault (.md 文件)
     ↓
-后续查询 → 检索知识库 → 关联展开(1-2跳) → 综合回答
+后续：检索 / 复习推送 / 知识合成 / 仪表盘
 ```
 
 ## 已知限制
 
 - 不能处理纯音频文件
 - 旧版 `.ppt` 需先用 `strings` 提取文本
-- 网页抓取依赖 curl，复杂页面需 browser 工具
+- 飞书推送需配置 webhook 或应用凭证
 
 ## License
 
