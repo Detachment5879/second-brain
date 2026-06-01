@@ -18,10 +18,7 @@ mkdir -p "$SKILL_DIR/second-brain/scripts"
 cp "$TMP/SKILL.md" "$SKILL_DIR/second-brain/"
 cp -r "$TMP/scripts/"* "$SKILL_DIR/second-brain/scripts/" 2>/dev/null || true
 
-# 安装增强模块 (brain-enhance)
-mkdir -p "$SKILL_DIR/brain-enhance/scripts"
-cp "$TMP/brain-enhance/SKILL.md" "$SKILL_DIR/brain-enhance/"
-cp -r "$TMP/brain-enhance/scripts/"* "$SKILL_DIR/brain-enhance/scripts/" 2>/dev/null || true
+# brain-enhance 已合并到 second-brain v2.0，无需单独安装
 
 # 清理
 rm -rf "$TMP"
