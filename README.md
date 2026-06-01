@@ -126,7 +126,7 @@ crontab -e
 
 **配定时任务（Windows）：**
 ```powershell
-schtasks /create /tn "BrainReview" /tr "python D:\second-brain\brain-enhance\scripts\brain-scheduler.py review" /sc daily /st 20:00
+schtasks /create /tn "BrainReview" /tr "python D:\second-brain\scripts\brain-scheduler.py review" /sc daily /st 20:00
 ```
 
 **配飞书推送（可选）：**
