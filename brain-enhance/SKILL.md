@@ -172,3 +172,67 @@ python3 brain-scheduler.py connect   # 合成建议
 ```
 
 所有 Agent 平台都可直接调用这个脚本，输出纯文本，无需任何适配。
+
+---
+
+## 非 Hermes 用户使用指南
+
+如果你用的是 **Codex CLI / OpenClaw / ChatGPT / 终端**，没有 Hermes 的 `@brain` 命令体系，照样能用全部功能。
+
+### 第一步：拿到脚本
+
+```bash
+git clone https://github.com/Detachment5879/second-brain.git
+cd second-brain/brain-enhance/scripts
+```
+
+### 第二步：设知识库路径
+
+```bash
+# Linux / macOS / WSL
+export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
+
+# Windows CMD
+set OBSIDIAN_VAULT_PATH=D:\知识库
+```
+
+不设也行，脚本会自动探测 `D:\知识库`。
+
+### 第三步：直接用
+
+```bash
+python3 brain-scheduler.py review    # 今日复习
+python3 brain-scheduler.py stats     # 知识仪表盘
+python3 brain-scheduler.py connect   # 合成建议
+```
+
+### 第四步（可选）：配定时任务
+
+**Linux/macOS/WSL：**
+```bash
+crontab -e
+# 加这一行：每晚8点复习
+0 20 * * * cd ~/second-brain/brain-enhance/scripts && python3 brain-scheduler.py review
+```
+
+**Windows：**
+```powershell
+schtasks /create /tn "BrainReview" /tr "python D:\second-brain\brain-enhance\scripts\brain-scheduler.py review" /sc daily /st 20:00
+```
+
+### 第五步（可选）：配飞书推送
+
+```bash
+export FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+python3 brain-scheduler.py review
+```
+
+### 和 CC/OpenClaw 配合
+
+直接让 Agent 执行：
+
+> "Run `python3 brain-scheduler.py review` and show me the results."
+
+> "Run `python3 brain-scheduler.py stats` and tell me which topics I should review."
+
+Agent 读取 stdout 输出即可，零集成成本。
