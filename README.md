@@ -106,6 +106,45 @@ second-brain-writer.py → Obsidian Vault (.md 文件)
 - 旧版 `.ppt` 需先用 `strings` 提取文本
 - 飞书推送需配置 webhook 或应用凭证
 
+## 非 Hermes 用户使用指南
+
+如果你用的是 **Codex CLI / OpenClaw / ChatGPT / 终端**，没有 `@brain` 命令体系：
+
+```bash
+# 1. 拿到脚本
+git clone https://github.com/Detachment5879/second-brain.git
+cd second-brain/brain-enhance/scripts
+
+# 2. 设知识库路径
+export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
+
+# 3. 直接用
+python3 brain-scheduler.py review    # 今日复习
+python3 brain-scheduler.py stats     # 知识仪表盘
+python3 brain-scheduler.py connect   # 合成建议
+```
+
+**配定时任务（Linux/macOS）：**
+```bash
+crontab -e
+0 20 * * * cd ~/second-brain/brain-enhance/scripts && python3 brain-scheduler.py review
+```
+
+**配定时任务（Windows）：**
+```powershell
+schtasks /create /tn "BrainReview" /tr "python D:\second-brain\brain-enhance\scripts\brain-scheduler.py review" /sc daily /st 20:00
+```
+
+**配飞书推送（可选）：**
+```bash
+export FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+python3 brain-scheduler.py review
+```
+
+**配合 CC/OpenClaw：** 直接让 Agent 执行 `python3 brain-scheduler.py review`，读取 stdout 即可。零集成成本。
+
+---
+
 ## License
 
 MIT © Detachment5879
