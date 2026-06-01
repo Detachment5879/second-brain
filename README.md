@@ -98,6 +98,10 @@ export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
 | brain-auto-save | 对话自动存档 + 价值审查 |
 | brain-enhance | 间隔复习 + 知识合成 + 智能评分 + 飞书推送 |
 
+| second-brain | 主脑：知识录入 + 查询 + 维护 |
+| brain-enhance | 增强：间隔复习 + 被动 RAG + 知识合成 + 评分 + 飞书 |
+
+> ⚠️ 手动安装需要**两个都装**才能使用全部功能。用 `install.sh` 一键装则无需关心。
 > 三个模块共用同一知识库，标签和链接体系互通。
 
 ## 原理
