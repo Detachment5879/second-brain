@@ -1,7 +1,7 @@
 ---
 name: second-brain
-description: Transform any unstructured input (meeting notes, articles, chat logs, ideas) into structured Obsidian knowledge nodes. Builds and maintains your personal knowledge base with bidirectional links, tags, and knowledge graphs.
-version: 1.1.0
+description: 🧠 Second Brain · 第二大脑 — 知识录入/对话存档/被动RAG/间隔复习/知识合成/智能评分/飞书推送。一键把你的碎片信息变成结构化 Obsidian 知识网络。
+version: 2.0.0
 allowed-tools: Read, Write, Edit, Bash, Web
 ---
 
@@ -21,12 +21,18 @@ allowed-tools: Read, Write, Edit, Bash, Web
 
 | 触发词 | 模式 |
 |--------|------|
-| `@brain` | 通用启动：处理一段知识输入 |
-| `帮我整理\|帮我记录\|记下来\|保存这个` | 用户有内容需要存入知识库 |
-| 用户发送**文件路径**（.docx/.pdf/.txt/.md） | 自动检测扩展名，读取并处理 |
-| 用户发送**网页链接/视频链接**（http:// 或 https://） | 自动抓取网页内容，提炼核心信息 |
-| 用户粘贴/输入一段**非结构化文本**（会议记录、笔记、灵感、文章片段） | 自动识别并处理 |
-| `查一下\|搜索\|我记得\|关于 [[某概念]]` | 查询知识库模式 |
+| `@brain` + 内容/文件/链接 | 通用启动：处理知识输入 |
+| `@brain save` / `帮我保存对话` | 对话存档：价值审查后存入 |
+| `@brain review` | 间隔复习：推送高优先级旧笔记 |
+| `@brain connect [主题词]` | 知识合成：跨笔记综合 |
+| `@brain score [笔记] [1-5]` | 修改笔记评分 |
+| `@brain stats` | 知识仪表盘 |
+| `@brain feishu on\|off` | 飞书推送开关 |
+| `@brain maintain` | 知识库维护 |
+| `查一下\|搜索\|我记得` | 查询知识库 |
+| **自动（无需触发）** | **被动 RAG：提问时自动检索知识库** |
+
+> **自动提示**：深度对话结束时主动询问是否需要 `@brain save`。
 
 ---
 
@@ -37,249 +43,172 @@ allowed-tools: Read, Write, Edit, Bash, Web
 
 1. **检查知识库路径**：
    ```bash
-   # 如果 OBSIDIAN_VAULT_PATH 未设置，尝试探测 Windows 知识库
    if [ -z "$OBSIDIAN_VAULT_PATH" ]; then
      if [ -d "/mnt/d/知识库" ]; then
        export OBSIDIAN_VAULT_PATH="/mnt/d/知识库"
-     elif [ -d "/mnt/c/Users/$USER/Desktop/知识库" ]; then
-       export OBSIDIAN_VAULT_PATH="/mnt/c/Users/$USER/Desktop/知识库"
      fi
    fi
-   echo "知识库路径: ${OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}"
    ```
 
-2. **检查依赖工具**：
+2. **确保目录存在**：
    ```bash
-   # 检查 python-docx（用于读取 .docx 文件）
-   python3 -c "import docx" 2>/dev/null || pip install python-docx 2>/dev/null || true
-   ```
-
-3. **确保知识库目录存在**：
-   ```bash
-   mkdir -p "${OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}"/{meetings,readings,ideas,insights,technical,people,concepts,retrospectives,inbox,logs}
+   mkdir -p "${OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}"/{理论,案例}
    ```
 
 ### Step 1：读取与解析输入
 
-#### 从文件读取（如果用户提供了文件路径）
-检测文件扩展名，用对应方式读取：
-
 | 文件类型 | 读取方式 |
 |----------|----------|
-| `.docx` | `python3 -c "import zipfile, xml.etree.ElementTree as ET; ..."`（内置库，不需额外依赖） |
-| `.txt`, `.md` | 直接 `read_file` 工具 |
-| `.pdf` | `python3 -c "import PyPDF2; ..."` 或 ocr 工具 |
+| `.docx` | zipfile + xml.etree（内置库） |
+| `.txt`, `.md` | read_file 工具 |
+| `.pdf` | PyPDF2 或 ocr |
 
-#### 从网页链接读取（如果用户发送了 http:// 或 https://）
+---
 
-用浏览器工具或 curl 抓取页面内容：
+### 模式一：知识录入（`@brain` + 内容）
 
-1. **判断链接类型**：
-   - 文章/文档页 → 提取正文内容
-   - 视频页（YouTube/B站等）→ 提取标题、描述、字幕（如有）
-   - 社交媒体帖 → 提取帖文内容
+分析 → 去噪 → 建模 → 价值审查 → 用户确认 → 写入。
 
-2. **提取核心内容**：
-   ```bash
-   # 通用网页抓取
-   curl -sL "{{URL}}" | python3 -c "
-   import sys, re
-   html = sys.stdin.read()
-   # 提取 <title>
-   title = re.search(r'<title>(.*?)</title>', html, re.DOTALL)
-   # 提取 <meta description>
-   desc = re.search(r'<meta name=\"description\" content=\"(.*?)\"', html)
-   # 提取正文段落（简化：取 <p> 标签内容）
-   paras = re.findall(r'<p[^>]*>(.*?)</p>', html, re.DOTALL)
-   clean = [re.sub(r'<[^>]+>', '', p).strip() for p in paras if len(p) > 50]
-   print(title.group(1) if title else 'No title')
-   print('---')
-   print(desc.group(1) if desc else '')
-   print('---')
-   for p in clean[:20]:
-       print(p)
-       print()
-   "
-   ```
+#### 价值审查
 
-3. **用 browser 工具（如果 curl 抓取不够）**：
-   - 用 `browser_navigate` 打开页面
-   - 用 `browser_snapshot` 获取页面内容
-   - 用 `browser_console` 执行 JS 提取正文
-### 模式一：知识录入（默认模式）
+| 标准 | 通过 | 不通过 |
+|------|------|--------|
+| 新颖性 | 新概念、新发现 | 反复聊的老话题 |
+| 可复用性 | 以后还会用到 | 一次性操作指令 |
+| 结构化潜力 | 能提炼成要点 | 纯闲聊 |
 
-当用户提供非结构化输入时，按以上 Step 0 → Step 1 → Step 2 顺序执行，然后继续：
+查重 + 脱敏 → **用户确认后才写入**。
 
-#### Step 3：知识建模
+#### 笔记模板
 
-| 类型 | 特征 | 输出笔记type |
-|------|------|-------------|
-| 会议/沟通记录 | 有对话、决议、待办 | `meeting-note` |
-| 学习笔记/阅读摘录 | 有知识点、概念、引用 | `reading-note` |
-| 行业资讯/文章 | 有事实、数据、观点 | `insight` |
-| 个人灵感/想法 | 主观、未成型、发散 | `idea` |
-| 经验教训/复盘 | 有因果、反思、结论 | `retrospective` |
-| 技术文档/教程 | 有步骤、代码、参数 | `technical-note` |
+```markdown
+---
+tags: [#主标签, #次标签]
+date: YYYY-MM-DD
+score: 4
+review_count: 0
+last_review: ""
+---
 
-#### Step 2：知识建模
+# 标题
 
-自动执行以下分析：
+> 一句话摘要
 
-1. **标签生成**：生成 3-5 个层级标签（从宽到窄）
-   - 主领域标签：`#programming` `#design` `#business` `#AI` 等
-   - 次级标签：`#architecture` `#会议纪要` 等
-   - 状态标签：`#inbox`（待整理）`#seedling`（新笔记）`#evergreen`（成熟笔记）
+## 要点
+- 要点一
+- 要点二
 
-2. **实体提取**：识别文本中的关键实体
-   - 人物：将人名转为 `[[人名]]` WikiLink
-   - 公司/组织：`[[公司名]]`
-   - 专业术语：`[[术语]]`
-   - 核心概念/理论：`[[概念名]]`
-   - 项目名：`[[项目名]]`
-
-3. **关联发现**：识别当前内容与知识库中已有内容的潜在关联
-   - 检查是否有相同实体出现
-   - 检查是否有相同标签
-   - 记录关联关系用于后续检索
-
-#### Step 4：生成 Obsidian Markdown
-
-执行写入工具生成标准化的笔记文件：
-
-```bash
-python3 ${HERMES_SKILL_DIR}/scripts/second-brain-writer.py \
-  --title "{{自动生成的标题}}" \
-  --type "{{内容类型}}" \
-  --tags "{{tag1,tag2,tag3}}" \
-  --content "{{处理后的结构化内容}}" \
-  --entities "{{entity1,entity2}}" \
-  --thinking "{{AI的推理笔记}}"
-```
-
-如果需要输出到非默认目录（如 Windows D 盘），加上 `--dir` 参数：
-
-```bash
-python3 ${HERMES_SKILL_DIR}/scripts/second-brain-writer.py \
-  --title "..." --type "..." --tags "..." \
-  --content "..." --entities "..." \
-  --dir "/mnt/d/知识库"
-```
-
-#### Step 5：存入知识库
-
-知识库目录结构：
-
-```
-{{OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}}/
-├── inbox/                    # 待处理的笔记
-├── meetings/                 # 会议记录
-├── readings/                 # 阅读笔记
-├── ideas/                    # 灵感
-├── insights/                 # 行业洞察
-├── technical/                # 技术笔记
-├── people/                   # 人物笔记
-├── concepts/                 # 概念解释
-├── retrospectives/           # 复盘
-├── logs/                     # 操作日志
-│   └── changelog.md          # 自动更新的变更记录
-└── .index.md                 # 自动维护的知识索引
+## 关联
+- [[相关笔记1]]
 ```
 
 ---
 
-### 模式二：知识查询（`@brain query` 或自然语言提问）
+### 模式二：知识查询（提问时自动 / 手动 `查一下`）
 
-当用户提问时：
-
-1. **检索知识库**：
-   ```bash
-   VAULT="${OBSIDIAN_VAULT_PATH:-$HOME/Documents/second-brain}"
-   find "$VAULT" -name "*.md" -type f | xargs grep -l "{{关键词}}" 2>/dev/null
-   ```
-
-2. **关联展开**：
-   根据当前问题的实体，递归检索关联笔记中的关联实体（1-2跳深度）
-
-3. **综合回答**：
-   基于检索结果生成回答，在回答中：
-   - 用 `[[WikiLink]]` 指向知识库中的相关笔记
-   - 标注信息来源（引用自哪篇笔记）
-   - 指出知识空白（如果有）
-
-4. **同步更新**（可选）：
-   如果用户提供了新信息或修正，自动更新/追加到相关笔记
+1. 检索知识库：`find + grep`
+2. 关联展开（1-2跳深度）
+3. 综合回答，引用 `[[WikiLink]]`
+4. 可选：同步更新相关笔记
 
 ---
 
 ### 模式三：知识维护（`@brain maintain`）
 
-定期或按需执行：
-
-1. **lint 检查**：扫描所有笔记，检查：
-   - 损坏的 WikiLink（`[[xxx]]` 指向不存在的笔记）
-   - 孤立笔记（没有反向链接）
-   - 过时的标签
-
-2. **索引重建**：重新生成 `.index.md`
-
-3. **图谱优化**：识别可以合并/拆分/链接的笔记
+1. 坏链检查（`[[xxx]]` 指向不存在）
+2. 孤岛笔记检测（无反链）
+3. 索引重建
+4. 图谱优化建议
 
 ---
 
-## 笔记模板
+### 模式四：对话存档（`@brain save`）
 
-每篇笔记遵循以下格式：
+分析当前对话 → 价值审查 → 理论/案例分类 → 用户确认 → 存入 Obsidian。
 
-```markdown
----
-tags:
-  - #{{主领域标签}}
-  - #{{次级标签}}
-  - #{{状态标签}}
-date: {{YYYY-MM-DD}}
-type: {{内容类型}}
-aliases:
-  - {{别名1}}
-sources:
-  - {{信息来源}}
----
-
-# {{笔记标题}}
-
-> {{一句话核心摘要}}
-
-## 💡 核心内容
-
-- 要点 1：...
-- 要点 2：...
-
-## 🔗 关联
-
-- 相关人物：[[人物1]], [[人物2]]
-- 相关概念：[[概念1]], [[概念2]]
-- 相关笔记：[[笔记标题]]
-
-## 📝 延伸思考
-
-- ...
+存入路径：理论类 → `理论/`，案例类 → `案例/`。
 
 ---
 
-*由 Second Brain Skill 于 {{YYYY-MM-DD HH:mm}} 自动生成*
+### 模式五：被动 RAG（自动，无需触发）
+
+每次用户提问时自动执行：
+1. 提取实体词（项目名、术语、人名）
+2. `grep` 搜索知识库
+3. 命中 → 提取段落 → 注入回答
+4. 引用 `[[笔记名]]`
+
+不触发：纯闲聊、一次性操作、知识库无匹配。
+
+---
+
+### 模式六：间隔复习（`@brain review`）
+
+#### 评分系统
+
+每条笔记 frontmatter 存储 `score`(1-5) / `review_count` / `last_review`。
+
+自动评分：理论+多实体=5 / 理论=4 / 案例+方法论=4 / 案例=3 / 临时=2 / inbox=1。
+
+用户可 `@brain score 笔记名 分数` 修改。5分每3天推 / 4分每7天 / 3分每14天 / 低分不推。
+
+#### 飞书推送
+
+优先级链：飞书 webhook → 飞书应用 → Hermes cron → 手动。
+
+`@brain feishu on` 开启，`off` 关闭。默认 20:00 推送。
+
+---
+
+### 模式七：知识合成（`@brain connect`）
+
+按标签+实体重叠聚类 → ≥3篇触发 → LLM 合成综合笔记（共识/互补/矛盾/演进）→ 存入 `理论/`。
+
+---
+
+### 模式八：仪表盘（`@brain stats`）
+
+```
+📊 知识库统计
+
+笔记 47 | 理论18 案例29 | 未评分12
+本周+5 | 本月+12
+
+🔥 活跃: #agent(23) #llm(15)
+⏰ 待复习: 18篇 | ⚠️ 孤岛: 3篇
+💡 建议 @brain connect agent
 ```
 
 ---
 
-## 工具使用规则
+## 跨平台自动化
 
-| 任务 | 使用工具 |
-|------|----------|
-| 读取用户输入 | 直接从用户消息读取 |
-| 生成笔记文件 | `Bash` → `python3 ${HERMES_SKILL_DIR}/scripts/second-brain-writer.py` |
-| 知识库检索 | `Bash` → `find+grep` |
-| 读取已有笔记 | `Read` 工具 |
-| 更新已有笔记 | `Write` / `Edit` 工具 |
-| 查看知识库统计 | `Bash` → `python3 ${HERMES_SKILL_DIR}/scripts/second-brain-writer.py --stats` |
+### Hermes
+内置 cronjob。`@brain feishu on` 即可。
+
+### Codex CLI / OpenClaw / 终端
+使用 `scripts/brain-scheduler.py`：
+
+```bash
+python3 brain-scheduler.py review    # 今日复习
+python3 brain-scheduler.py stats     # 知识仪表盘
+python3 brain-scheduler.py connect   # 合成建议
+```
+
+**配定时任务：**
+```bash
+# Linux/macOS crontab
+0 20 * * * python3 brain-scheduler.py review
+
+# Windows 任务计划程序
+schtasks /create /tn "BrainReview" /tr "python brain-scheduler.py review" /sc daily /st 20:00
+```
+
+**飞书推送：**
+```bash
+export FEISHU_WEBHOOK_URL="https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+python3 brain-scheduler.py review
+```
 
 ---
 
@@ -287,86 +216,22 @@ sources:
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `OBSIDIAN_VAULT_PATH` | Obsidian 知识库路径 | `$HOME/Documents/second-brain` |
+| `OBSIDIAN_VAULT_PATH` | 知识库路径 | 自动探测 `D:\知识库` |
+| `FEISHU_WEBHOOK_URL` | 飞书推送 | 无 |
 
 ---
 
-## 已知问题与规避（实战总结）
+## 已知限制
 
-### 1. 旧版 .ppt 文件读取
-- `.ppt`（旧版 OLE 格式）无法用 python-pptx 读取
-- **规避**：用 `strings file.ppt | grep -E '.{15,}'` 提取纯文本
-- 或先用 LibreOffice 转为 .pptx
-
-### 2. --content 参数换行符转义
-- 通过 shell 传 `--content` 时 `\n` 会被转义为字面量而非换行
-- **规避**：写入笔记文件后执行 `content.replace('\\n', '\n')` 修复
-
-### 3. --dir 模式下 index 写入崩溃
-- `update_index()` 中的 `filepath.relative_to(VAULT_PATH)` 在用 `--dir` 时崩溃
-- **已修复**：移除 `relative_to` 调用，全链传递 `vault_path`
-
-### 4. 图片/语音限制
-- ❌ 不能处理纯音频文件
-- ✅ 能用 vision_analyze 读取图片文字（适合PPT截图、手写笔记、聊天记录截图）
-
-### 5. 知识库路径探测优先级
-1. `$OBSIDIAN_VAULT_PATH` 环境变量
-2. `/mnt/d/知识库`（Windows D盘）
-3. `$HOME/Documents/second-brain`（默认）
+- 不能处理纯音频
+- 旧版 `.ppt` 需 `strings` 提取
+- 飞书推送需配置 webhook
 
 ---
 
 ## 安全边界
 
-1. **仅处理用户主动提供的信息**
-2. **本地优先**：所有文件存储本地，不自动上传
-3. **透明更新**：修改已有笔记前向用户确认
-
----
-
-## 示例
-
-### 示例 1：会议记录
-
-**用户输入**：
-> 今天和张三讨论了新项目的架构。决定用微服务，每个团队负责一个模块。后端用 Go，前端继续 React。
-
-**生成笔记**：
-```markdown
----
-tags:
-  - #programming
-  - #architecture
-  - #meeting-note
-date: 2026-05-11
-type: meeting-note
----
-
-# 新项目架构讨论
-
-## 💡 核心决议
-- 采用[[微服务架构]]，各团队独立负责模块
-- 后端技术栈：[[Go]]
-- 前端技术栈：[[React]]
-
-## 🔗 关联
-- 关键人物：[[张三]]
-- 相关概念：[[微服务架构]]
-
-## 📝 待办
-- [ ] 各团队确认模块边界
-```
-
-### 示例 2：查询知识库
-
-**用户**：`查一下微服务相关的内容`
-
-**回答**：
-> 知识库中有以下相关笔记：
-> - [[新项目架构讨论]]（2026-05-11）— 你决定用微服务架构
-> - [[微服务架构模式]]（2026-04-20）— 记录了 Service Mesh 相关内容
->
-> 还关联到：[[Go]], [[Docker]], [[Kubernetes]]
->
-> 要我展开讲讲某个具体方面吗？
+1. 仅处理用户主动提供的信息
+2. 本地存储，不自动上传
+3. 修改已有笔记前确认
+4. 写入前价值审查 + 用户确认
